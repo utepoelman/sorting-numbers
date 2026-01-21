@@ -1,0 +1,672 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nugget's Seed Shelf (Ordering Numbers)</title>
+    <style>
+        /* --- GENERAL STYLES --- */
+        body { 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+            background-color: #fcf8e3; 
+            display: flex; flex-direction: column; align-items: center; 
+            min-height: 100vh; margin: 0; padding: 20px; 
+            user-select: none; overflow-x: hidden; 
+        }
+        h1 { color: #5d4037; margin-bottom: 5px; text-align: center; }
+        .subtitle { color: #795548; font-size: 18px; text-align: center; max-width: 700px; margin-bottom: 20px; line-height: 1.5; }
+
+        /* --- SETUP SCREEN --- */
+        #setup-screen { background: white; padding: 40px; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); text-align: center; max-width: 600px; width: 100%; margin-top: 30px; border: 4px solid #8d6e63; }
+        .checkbox-group { text-align: left; display: inline-block; margin: 20px 0; background: #f9f9f9; padding: 20px; border-radius: 10px; }
+        .checkbox-item { margin: 10px 0; font-size: 18px; color: #555; cursor: pointer; display: flex; align-items: center; }
+        .checkbox-item input { width: 22px; height: 22px; margin-right: 12px; cursor: pointer; accent-color: #ffc107; }
+        
+        /* --- GAME CONTAINER --- */
+        #game-container { display: none; width: 100%; max-width: 1000px; flex-direction: column; align-items: center; }
+
+        /* PROGRESS BAR */
+        .progress-wrapper { width: 100%; height: 25px; background-color: #e0e0e0; border-radius: 12px; overflow: hidden; margin-bottom: 20px; box-shadow: inset 0 2px 5px rgba(0,0,0,0.1); position: relative; border: 1px solid #ccc; }
+        .progress-fill { height: 100%; background-color: #8bc34a; width: 0%; transition: width 0.5s ease; background-image: linear-gradient(45deg,rgba(255,255,255,.15) 25%,transparent 25%,transparent 50%,rgba(255,255,255,.15) 50%,rgba(255,255,255,.15) 75%,transparent 75%,transparent); background-size: 1rem 1rem; }
+        .progress-text { position: absolute; width: 100%; text-align: center; top: 0; line-height: 25px; font-size: 14px; font-weight: bold; color: #444; }
+
+        /* PLAY AREA */
+        .play-area { background: white; width: 100%; padding: 30px 20px; border-radius: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); display: flex; flex-direction: column; align-items: center; position: relative; overflow: hidden; border-top: 5px solid #ffc107; }
+        
+        /* TOP ROW: NUGGET + SOURCE */
+        .top-row { display: flex; align-items: center; justify-content: center; width: 100%; margin-bottom: 20px; }
+        .nugget-mascot { width: 100px; height: auto; margin-right: 30px; filter: drop-shadow(2px 4px 6px rgba(0,0,0,0.1)); transition: transform 0.3s; }
+        .nugget-mascot:hover { transform: rotate(-5deg) scale(1.05); }
+
+        #source-container { width: 150px; height: 120px; display: flex; flex-direction: column; align-items: center; justify-content: center; border: 2px dashed #ddd; border-radius: 10px; position: relative; background: #fafafa; }
+        .instruction-tag { position: absolute; top: -10px; background: white; padding: 0 5px; font-size: 12px; color: #888; text-transform: uppercase; letter-spacing: 1px; font-weight: bold; }
+
+        /* CARDS */
+        .card { 
+            background: #fff; 
+            border: 3px solid #5d4037; 
+            border-radius: 8px; 
+            padding: 10px 20px; 
+            font-size: 24px; font-weight: bold; color: #333; 
+            min-width: 80px; height: 70px;
+            white-space: nowrap;
+            text-align: center; cursor: grab; 
+            box-shadow: 4px 4px 0px rgba(93, 64, 55, 0.2);
+            user-select: none; 
+            display: flex; align-items: center; justify-content: center;
+            position: relative;
+            z-index: 2;
+            transition: transform 0.1s;
+        }
+        .card::before { content:''; position: absolute; top: 4px; left: 4px; right: 4px; height: 2px; background: #e0e0e0; border-radius: 2px; }
+        .card::after { content:''; position: absolute; bottom: 4px; left: 4px; right: 4px; height: 2px; background: #e0e0e0; border-radius: 2px; }
+
+        .card:active { cursor: grabbing; transform: scale(0.98); box-shadow: 2px 2px 0px rgba(93, 64, 55, 0.2); }
+        .card.dragging { opacity: 0.6; transform: scale(0.9); }
+        .card.shake { animation: shake 0.5s; border-color: #dc3545; color: #dc3545; }
+        
+        /* Math Types */
+        .frac { display: inline-flex; flex-direction: column; vertical-align: middle; margin: 0 2px; text-align: center; font-size: 0.85em; }
+        .frac-top { border-bottom: 2px solid #333; padding: 0 2px; line-height: 1; margin-bottom: 2px; }
+        .frac-bot { padding: 0 2px; line-height: 1; }
+        sup { font-size: 0.6em; vertical-align: super; }
+
+        /* TIMELINE CONTAINER */
+        #timeline-viewport {
+            width: 100%;
+            overflow-x: auto;
+            overflow-y: hidden;
+            padding: 40px 0;
+            position: relative;
+            scrollbar-width: thin;
+            scrollbar-color: #8d6e63 #f1f1f1;
+        }
+        #timeline-viewport::-webkit-scrollbar { height: 12px; }
+        #timeline-viewport::-webkit-scrollbar-track { background: #f1f1f1; border-radius: 6px; }
+        #timeline-viewport::-webkit-scrollbar-thumb { background: #8d6e63; border-radius: 6px; border: 2px solid #f1f1f1; }
+
+        #timeline-track {
+            display: inline-flex; 
+            align-items: center;
+            padding: 0 100px; /* Extra space for arrow head */
+            min-width: 100%; 
+            box-sizing: border-box;
+            position: relative;
+            height: 120px;
+        }
+
+        /* ARROW LINE */
+        .axis-line {
+            position: absolute;
+            top: 50%;
+            left: 20px;
+            right: 40px; 
+            height: 6px;
+            background-color: #5d4037;
+            z-index: 0;
+            border-radius: 3px;
+            pointer-events: none;
+        }
+        .axis-line::after {
+            content: '';
+            position: absolute;
+            right: -25px; 
+            top: -12px; 
+            border-width: 15px 0 15px 30px; 
+            border-style: solid;
+            border-color: transparent transparent transparent #5d4037;
+        }
+
+        /* ITEM WRAPPERS */
+        .timeline-item {
+            margin: 0 25px; 
+            position: relative;
+            z-index: 2;
+            flex-shrink: 0; 
+            transition: transform 0.4s cubic-bezier(0.2, 0.8, 0.2, 1);
+        }
+        
+        /* BUTTONS */
+        .btn { padding: 12px 24px; font-size: 16px; border: none; border-radius: 30px; cursor: pointer; margin: 5px; transition: transform 0.1s, box-shadow 0.1s; font-weight: bold; text-transform: uppercase; letter-spacing: 0.5px; }
+        .btn:hover { transform: translateY(-2px); box-shadow: 0 4px 8px rgba(0,0,0,0.2); }
+        .btn:active { transform: translateY(0); }
+        
+        .btn-primary { background-color: #8bc34a; color: white; box-shadow: 0 4px 0 #689f38; }
+        .btn-nugget { background-color: #ffc107; color: #5d4037; border: 2px solid #e0a800; }
+        .btn-reset { background-color: #9e9e9e; color: white; }
+        .btn-finish { background-color: #4caf50; color: white; display: none; margin-top: 20px; font-size: 20px; padding: 15px 40px; animation: pop 0.5s; box-shadow: 0 5px 0 #388e3c; }
+
+        .control-bar { margin-top: 20px; display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; }
+
+        /* MODALS */
+        .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); display: none; justify-content: center; align-items: center; z-index: 2000; }
+        .modal-content { background: white; padding: 30px; border-radius: 15px; max-width: 500px; width: 90%; text-align: center; position: relative; box-shadow: 0 10px 25px rgba(0,0,0,0.2); }
+        .close-btn { position: absolute; top: 10px; right: 15px; font-size: 28px; cursor: pointer; color: #aaa; font-weight: bold; }
+        
+        .help-flex { display: flex; align-items: flex-start; text-align: left; }
+        
+        /* FINAL SCREEN WRAPPER (Includes Cert + Buttons) */
+        #final-screen-wrapper {
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            width: 100%;
+            padding-bottom: 50px;
+        }
+
+        #certificate-view { 
+            text-align: center; 
+            background: white; 
+            padding: 40px; 
+            border: 12px solid #ffc107; 
+            border-radius: 20px; 
+            max-width: 700px; 
+            width: 90%;
+            margin-top: 20px; 
+            position: relative; 
+            box-shadow: 0 10px 30px rgba(0,0,0,0.15); 
+        }
+
+        .cert-title { color: #28a745; font-size: 38px; margin-bottom: 10px; font-family: 'Georgia', serif; text-decoration: underline; text-decoration-color: #ffd54f; }
+        .cert-body { font-size: 18px; color: #555; margin: 20px 0; line-height: 1.8; }
+        .cert-big { font-size: 32px; font-weight: bold; color: #333; border-bottom: 2px solid #333; display: inline-block; padding: 0 20px; margin: 10px 0; }
+        .cert-footer { display: flex; justify-content: space-between; align-items: flex-end; margin-top: 40px; }
+        .sig-block { text-align: center; font-family: 'Brush Script MT', cursive; font-size: 26px; color: #007bff; }
+        .paw-print { font-size: 40px; color: #5d4037; opacity: 0.6; transform: rotate(15deg); display: inline-block; }
+        .cert-img { width: 100px; transform: rotate(-10deg); border: 3px solid #eee; border-radius: 50%; padding: 5px; }
+
+        .cert-buttons-container {
+            margin-top: 30px;
+            display: flex;
+            gap: 20px;
+            justify-content: center;
+        }
+
+        /* --- PRINT STYLES --- */
+        @media print {
+            @page {
+                size: A4 portrait;
+                margin: 2cm 2cm 0 2cm; 
+            }
+            body {
+                background: white;
+                display: block;
+                margin: 0;
+                padding: 0;
+            }
+            
+            /* Hide UI Elements */
+            #setup-screen, #game-container, .modal-overlay, .cert-buttons-container, .control-bar {
+                display: none !important;
+            }
+
+            /* Show and Position Cert */
+            #final-screen-wrapper {
+                display: block !important;
+                padding: 0;
+                margin: 0;
+            }
+            #certificate-view {
+                display: block !important;
+                border: 12px solid #ffc107 !important;
+                box-shadow: none !important;
+                width: 100% !important;
+                max-width: none !important;
+                margin: 0 !important;
+                box-sizing: border-box;
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
+            }
+        }
+
+    </style>
+</head>
+<body>
+
+    <div id="setup-screen">
+        <h1 style="font-size: 2.5em;">Nugget's Seed Shelf</h1>
+        <p class="subtitle" style="font-size: 1.1em;">
+            Nugget has gathered so many jars of seeds for the winter! <br>
+            But his pantry is a mess. Can you help him arrange the jars on the shelf 
+            from <strong>smallest</strong> value to <strong>largest</strong> value?
+        </p>
+        <div class="checkbox-group">
+            <p style="margin-top:0; font-weight:bold; color:#5d4037;">What kind of labels are on the jars?</p>
+            <label class="checkbox-item"><input type="checkbox" id="type-int" checked> Integers (-5, 3)</label>
+            <label class="checkbox-item"><input type="checkbox" id="type-dec"> Decimals (0.9, 0.901)</label>
+            <label class="checkbox-item"><input type="checkbox" id="type-frac"> Fractions (&frac12;, &frac34;)</label>
+            <label class="checkbox-item"><input type="checkbox" id="type-sci"> Scientific Notation (1.2 &times; 10<sup>-4</sup>)</label>
+        </div>
+        <br>
+        <button class="btn btn-primary" style="font-size: 1.2em; padding: 15px 40px;" onclick="startGame()">Start Sorting</button>
+    </div>
+
+    <div id="game-container">
+        <h1>Sorting for Nugget</h1>
+        
+        <div class="progress-wrapper">
+            <div class="progress-fill" id="prog-fill"></div>
+            <div class="progress-text" id="prog-text">0 / 10 Jars Placed</div>
+        </div>
+
+        <div class="play-area">
+            
+            <div class="top-row">
+                <img src="Nugget.png" class="nugget-mascot" alt="Nugget" title="Nugget is watching!">
+                
+                <div id="source-container">
+                    <span class="instruction-tag">New Jar</span>
+                    </div>
+            </div>
+
+            <div id="timeline-viewport">
+                <div id="timeline-track">
+                    <div class="axis-line"></div>
+                    </div>
+            </div>
+            
+            <p style="color: #999; font-size: 14px; margin-top: 15px; font-style: italic;">
+                (Scroll left or right if the shelf gets too full!)
+            </p>
+        </div>
+
+        <button class="btn btn-finish" id="finishBtn" onclick="openCertModal()">Claim Certificate</button>
+
+        <div class="control-bar">
+            <button class="btn btn-nugget" onclick="openHelp()">How do I do this? Ask Nugget!</button>
+            <button class="btn btn-reset" onclick="initGameLogic()">Restart (Same Settings)</button>
+            <button class="btn btn-reset" onclick="showMainMenu()">Back to Menu</button>
+        </div>
+    </div>
+
+    <div id="certModal" class="modal-overlay">
+        <div class="modal-content">
+            <span class="close-btn" onclick="closeModal('certModal')">&times;</span>
+            <h2 style="color:#4caf50;">Excellent Sorting!</h2>
+            <p>Nugget's pantry looks amazing. He can find all his favorite snacks now.</p>
+            <p>Enter your name for the Helper Certificate:</p>
+            <input type="text" id="nameInput" placeholder="Your Name" style="padding: 12px; font-size: 18px; width: 80%; margin-bottom: 20px; border-radius: 5px; border: 1px solid #ccc;">
+            <br>
+            <button class="btn btn-primary" onclick="generateCert()">Get Certificate</button>
+        </div>
+    </div>
+
+    <div id="helpModal" class="modal-overlay" onclick="if(event.target === this) closeModal('helpModal')">
+        <div class="modal-content" style="text-align: left;">
+            <span class="close-btn" onclick="closeModal('helpModal')">&times;</span>
+            <div class="help-flex">
+                <div style="flex:1;">
+                    <h3 style="margin-top: 0; color:#5d4037;">Nugget says:</h3>
+                    <ul style="padding-left: 20px; color: #444; line-height: 1.6;">
+                        <li>A new jar appears in the box next to me.</li>
+                        <li><strong>Drag</strong> it down to the shelf line.</li>
+                        <li>The other jars will <strong>slide apart</strong> to make space.</li>
+                        <li>Remember: <strong>Smallest</strong> on the Left, <strong>Largest</strong> on the Right.</li>
+                        <li><strong>Swipe/Scroll</strong> sideways if you need to see more of the shelf.</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="final-screen-wrapper">
+        <div id="certificate-view">
+            <div class="cert-title">Pantry Helper Certificate</div>
+            <p class="cert-body">This certifies that</p>
+            <div id="cert-name" class="cert-big">Student Name</div>
+            <p class="cert-body">
+                Has expertly organized Nugget's seed collection using:<br>
+                <em id="cert-types" style="color: #5d4037; font-weight: bold;">Integers</em>
+            </p>
+            <p class="cert-body">Date: <span id="cert-time"></span></p>
+            <div class="cert-footer">
+                <img src="Nugget.png" class="cert-img" alt="Nugget">
+                <div class="sig-block">
+                    <div class="paw-print">🐾 🐾</div>
+                    <p style="margin: 5px 0 0 0;">Nugget</p>
+                </div>
+            </div>
+            <p style="font-size: 12px; color: #ccc; margin-top: 20px;">Code: <span id="cert-code"></span></p>
+        </div>
+
+        <div class="cert-buttons-container">
+            <button class="btn btn-primary" onclick="window.print()">Print / Save PDF</button>
+            <button class="btn btn-reset" onclick="showMainMenu()">Back to Menu</button>
+        </div>
+    </div>
+
+    <script>
+        /* --- STATE --- */
+        let orderedNumbers = []; 
+        let currentTarget = null;
+        let activeTypes = [];
+        let numbersPlaced = 0;
+        const TARGET_GOAL = 10;
+        
+        let dragSrc = null; 
+        let currentDropIndex = -1;
+        let allowNegatives = false;
+
+        /* --- SETUP --- */
+        function startGame() {
+            activeTypes = [];
+            if(document.getElementById('type-int').checked) activeTypes.push('int');
+            if(document.getElementById('type-dec').checked) activeTypes.push('dec');
+            if(document.getElementById('type-frac').checked) activeTypes.push('frac');
+            if(document.getElementById('type-sci').checked) activeTypes.push('sci');
+
+            if(activeTypes.length === 0) {
+                alert("Please select at least one type of jar label!");
+                return;
+            }
+
+            // Negatives are only allowed if 'int' (integers) is selected
+            allowNegatives = activeTypes.includes('int');
+
+            document.getElementById('setup-screen').style.display = 'none';
+            document.getElementById('game-container').style.display = 'flex';
+            initGameLogic();
+        }
+
+        function showMainMenu() {
+            // Immediate Return, no confirm
+            document.getElementById('game-container').style.display = 'none';
+            document.getElementById('final-screen-wrapper').style.display = 'none';
+            document.getElementById('setup-screen').style.display = 'block';
+            
+            // Reset internal state
+            orderedNumbers = [];
+            numbersPlaced = 0;
+            document.getElementById('timeline-track').innerHTML = '<div class="axis-line"></div>';
+        }
+
+        function initGameLogic() {
+            orderedNumbers = [];
+            numbersPlaced = 0;
+            currentDropIndex = -1;
+            updateProgress();
+            document.getElementById('finishBtn').style.display = 'none';
+            document.getElementById('source-container').innerHTML = '<span class="instruction-tag">New Jar</span>';
+            
+            // Initial Seed
+            let startNum = generateNumber();
+            orderedNumbers.push(startNum);
+            
+            renderTimeline();
+            generateNextTarget();
+        }
+
+        /* --- MATH LOGIC --- */
+        function gcd(a, b) {
+            return b === 0 ? a : gcd(b, a % b);
+        }
+
+        function generateNumber() {
+            let attempts = 0;
+            let candidate, distinct;
+            do {
+                candidate = createRandomNumber();
+                distinct = true;
+                // Check duplicates (epsilon check)
+                for(let n of orderedNumbers) {
+                    if(Math.abs(n.val - candidate.val) < 0.000001) distinct = false;
+                }
+                attempts++;
+            } while (!distinct && attempts < 50);
+            return candidate;
+        }
+
+        function createRandomNumber() {
+            const type = activeTypes[Math.floor(Math.random() * activeTypes.length)];
+            
+            // Determine sign
+            let sign = 1;
+            if(allowNegatives && Math.random() < 0.5) {
+                sign = -1;
+            }
+
+            if (type === 'int') {
+                let val = Math.floor(Math.random() * 20) + 1; // 1 to 20
+                if(allowNegatives) {
+                    val = Math.floor(Math.random() * 41) - 20; 
+                } else {
+                    val = Math.floor(Math.random() * 21);
+                }
+                return { val: val, html: `${val}` };
+            } 
+            else if (type === 'dec') {
+                // Vary decimal places (1, 2, or 3)
+                let places = Math.floor(Math.random() * 3) + 1; 
+                let range = 20; 
+                let raw = Math.random() * range; 
+                let val = raw * sign;
+                if(!allowNegatives) val = Math.abs(val);
+
+                let strVal = val.toFixed(places);
+                return { val: parseFloat(strVal), html: `${strVal}` };
+            }
+            else if (type === 'frac') {
+                let den = Math.floor(Math.random() * 8) + 2; // 2 to 9
+                let num = Math.floor(Math.random() * 20) + 1; // 1 to 20
+                
+                // Simplify
+                let common = gcd(num, den);
+                num = num / common;
+                den = den / common;
+                
+                let val = (num / den) * sign;
+                if(!allowNegatives) val = Math.abs(val);
+
+                // For display, attach sign to numerator
+                let dispNum = (val < 0) ? -num : num;
+
+                // SPECIAL LOGIC: If den is 1, return Whole Number HTML
+                if (den === 1) {
+                     return {
+                        val: val,
+                        html: `${dispNum}`
+                     };
+                }
+
+                return { 
+                    val: val, 
+                    html: `<div class="frac"><span class="frac-top">${dispNum}</span><span class="frac-bot">${den}</span></div>` 
+                };
+            }
+            else if (type === 'sci') {
+                let exp = Math.floor(Math.random() * 17) - 8; 
+                // FIXED BASE GENERATION: Strictly 1.0 to 9.9
+                let base = (Math.floor(Math.random() * 90) + 10) / 10;
+                
+                let val = base * Math.pow(10, exp) * sign;
+                if(!allowNegatives) val = Math.abs(val);
+
+                let displaySign = (val < 0) ? '-' : '';
+
+                return {
+                    val: val,
+                    html: `${displaySign}${base} &times; 10<sup>${exp}</sup>`
+                };
+            }
+        }
+
+        /* --- DRAG & DROP LOGIC --- */
+        
+        function generateNextTarget() {
+            if(numbersPlaced >= TARGET_GOAL) {
+                const container = document.getElementById('source-container');
+                container.innerHTML = `<div style="color:#28a745; font-weight:bold; font-size:24px;">Done!</div>`;
+                document.getElementById('finishBtn').style.display = 'block';
+                return;
+            }
+
+            currentTarget = generateNumber();
+            const container = document.getElementById('source-container');
+            container.innerHTML = '<span class="instruction-tag">New Jar</span>';
+            
+            const card = document.createElement('div');
+            card.className = 'card';
+            card.draggable = true;
+            card.id = 'active-drag-card';
+            card.innerHTML = currentTarget.html;
+            
+            card.addEventListener('dragstart', (e) => {
+                dragSrc = card;
+                card.classList.add('dragging');
+                e.dataTransfer.effectAllowed = 'move';
+                e.dataTransfer.setData('text/html', card.innerHTML);
+            });
+
+            card.addEventListener('dragend', (e) => {
+                card.classList.remove('dragging');
+                resetTimelineVisuals();
+            });
+            
+            container.appendChild(card);
+        }
+
+        const track = document.getElementById('timeline-track');
+        const viewport = document.getElementById('timeline-viewport');
+
+        viewport.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'move';
+            handleDragHover(e.clientX);
+        });
+
+        viewport.addEventListener('drop', (e) => {
+            e.preventDefault();
+            handleDrop();
+        });
+
+        viewport.addEventListener('dragleave', (e) => {
+            const rect = viewport.getBoundingClientRect();
+            if(e.clientX < rect.left || e.clientX > rect.right || e.clientY < rect.top || e.clientY > rect.bottom) {
+                resetTimelineVisuals();
+                currentDropIndex = -1;
+            }
+        });
+
+        function handleDragHover(mouseX) {
+            const items = Array.from(document.querySelectorAll('.timeline-item'));
+            if(items.length === 0) return;
+
+            let foundIndex = items.length; 
+
+            for(let i = 0; i < items.length; i++) {
+                const rect = items[i].getBoundingClientRect();
+                const center = rect.left + rect.width / 2;
+                if(mouseX < center) {
+                    foundIndex = i;
+                    break;
+                }
+            }
+
+            if(foundIndex !== currentDropIndex) {
+                currentDropIndex = foundIndex;
+                applyGapVisuals(foundIndex, items);
+            }
+        }
+
+        function applyGapVisuals(index, items) {
+            const GAP_SIZE = 120;
+            items.forEach((item, i) => {
+                if(i >= index) {
+                    item.style.transform = `translateX(${GAP_SIZE/2}px)`; 
+                } else {
+                    item.style.transform = `translateX(-${GAP_SIZE/2}px)`; 
+                }
+            });
+        }
+
+        function resetTimelineVisuals() {
+            const items = document.querySelectorAll('.timeline-item');
+            items.forEach(item => {
+                item.style.transform = 'translateX(0)';
+            });
+        }
+
+        function handleDrop() {
+            if(currentDropIndex === -1) return;
+            
+            const val = currentTarget.val;
+            let correct = true;
+
+            // Check neighbors
+            if(currentDropIndex > 0) {
+                if(orderedNumbers[currentDropIndex - 1].val > val) correct = false;
+            }
+            if(currentDropIndex < orderedNumbers.length) {
+                if(orderedNumbers[currentDropIndex].val < val) correct = false;
+            }
+
+            if(correct) {
+                orderedNumbers.splice(currentDropIndex, 0, currentTarget);
+                numbersPlaced++;
+                updateProgress();
+                renderTimeline();
+                generateNextTarget();
+            } else {
+                resetTimelineVisuals();
+                const source = document.getElementById('active-drag-card');
+                if(source) {
+                    source.classList.add('shake');
+                    setTimeout(() => source.classList.remove('shake'), 500);
+                }
+            }
+            currentDropIndex = -1;
+        }
+
+        function renderTimeline() {
+            track.innerHTML = '<div class="axis-line"></div>'; 
+            
+            orderedNumbers.forEach((numObj) => {
+                const wrapper = document.createElement('div');
+                wrapper.className = 'timeline-item';
+                
+                const card = document.createElement('div');
+                card.className = 'card';
+                card.innerHTML = numObj.html;
+                
+                wrapper.appendChild(card);
+                track.appendChild(wrapper);
+            });
+        }
+
+        function updateProgress() {
+            const pct = (numbersPlaced / TARGET_GOAL) * 100;
+            document.getElementById('prog-fill').style.width = pct + '%';
+            document.getElementById('prog-text').innerText = `${numbersPlaced} / ${TARGET_GOAL} Jars`;
+        }
+
+        /* --- MODALS --- */
+        function openHelp() { document.getElementById('helpModal').style.display = 'flex'; }
+        function closeModal(id) { document.getElementById(id).style.display = 'none'; }
+        
+        function openCertModal() {
+            if(numbersPlaced < TARGET_GOAL) return;
+            document.getElementById('certModal').style.display = 'flex'; 
+        }
+
+        function generateCert() {
+            const n = document.getElementById('nameInput').value;
+            if(!n) return alert('Name required');
+            
+            document.getElementById('certModal').style.display = 'none';
+            document.getElementById('game-container').style.display = 'none';
+            document.getElementById('setup-screen').style.display = 'none';
+
+            document.getElementById('cert-name').innerText = n;
+            document.getElementById('cert-time').innerText = new Date().toLocaleString();
+            
+            const labels = { 'int': 'Integers', 'dec': 'Decimals', 'frac': 'Fractions', 'sci': 'Scientific Notation' };
+            const typeText = activeTypes.map(t => labels[t]).join(', ');
+            document.getElementById('cert-types').innerText = typeText;
+            document.getElementById('cert-code').innerText = "CODE: " + Math.floor(Math.random()*100000);
+            
+            document.getElementById('final-screen-wrapper').style.display = 'flex';
+        }
+
+    </script>
+</body>
+</html>
